@@ -83,7 +83,7 @@
 
         <div class="form-group">
             <label for="text">စာသား ရိုက်ထည့်ပါ:</label>
-            <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - အွေႏနာꩻ)">
+            <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - ခွဲးဟောဝ်ဒျာႏ)">
         </div>
 
         <div class="form-group">
@@ -102,51 +102,50 @@
 
     <script>
         const basePath = "./audio/";
-        let audioFiles = [];
+        let metadataMap = new Map(); // Transcript -> Filename map လုပ်ရန်
+        let transcriptList = [];     // Sort စီထားသော Transcript စာရင်း
         let audioCache = new Map();
         let ctx;
 
-        // metadata.csv ကို ဖတ်ယူပြီး စာသား / ဖိုင်အမည်များကို စာရင်းသွင်းခြင်း
+        // metadata.csv ကို ဖတ်ပြီး စာသား နှင့် ဖိုင်နာမည် (pao_audio_xxxx.wav) ကို ချိတ်ဆက်ခြင်း
         async function loadMetadata() {
             try {
                 let res = await fetch("metadata.csv");
                 if (res.ok) {
                     let text = await res.text();
                     let lines = text.split("\n");
-                    let files = [];
 
                     for (let i = 1; i < lines.length; i++) {
                         let cols = lines[i].split(",");
                         if (cols.length >= 2) {
-                            let filename = cols[0].trim();
-                            let word = filename.replace(/\.[^/.]+$/, "");
-                            let transcript = cols[1].trim();
+                            let filename = cols[0].trim(); // pao_audio_0001.wav
+                            let transcript = cols[1].trim(); // ခွဲးဟောဝ်ဒျာႏ
 
-                            if (word) files.push(word);
-                            if (transcript) files.push(transcript);
+                            if (filename && transcript) {
+                                metadataMap.set(transcript, filename);
+                                transcriptList.push(transcript);
+                            }
                         }
                     }
 
-                    // Duplicates ဖယ်ထုတ်ပြီး အရှည်ဆုံး စကားလုံးများ အရင်လာအောင် Sort စီမည်
-                    audioFiles = [...new Set(files)].sort((a, b) => b.length - a.length);
+                    // အရှည်ဆုံး စကားလုံးများ အရင် Match ဖြစ်အောင် Sort စီမည်
+                    transcriptList.sort((a, b) => b.length - a.length);
                 }
             } catch (e) {
-                console.warn("metadata.csv ကို ဖတ်မရပါ၊ မူလ Array ကို သုံးပါမည်:", e);
-                // Fallback Array
-                audioFiles = ["အွေႏ", "နာꩻ", "ကတူႏ", "နျာႏ", "ထဲင်း", "ခွေ", "လꩻ", "နေ", "ဟောင်း", "နဲ့"].sort((a, b) => b.length - a.length);
+                console.error("metadata.csv ဖတ်မရပါ:", e);
             }
         }
 
         window.addEventListener("DOMContentLoaded", loadMetadata);
 
-        // စာသားကို အရှည်ဆုံး စကားလုံးအလိုက် တိတိကျကျ ခွဲထုတ်ခြင်း
+        // ရိုက်ထည့်လိုက်သော စာသားကို metadata ထဲမှ စကားလုံးများနှင့် ကိုက်ညီရာ ခွဲထုတ်ခြင်း
         function smartSplit(text) {
             let result = [];
             while (text.length > 0) {
                 let found = "";
-                for (let f of audioFiles) {
-                    if (text.startsWith(f)) {
-                        found = f;
+                for (let t of transcriptList) {
+                    if (text.startsWith(t)) {
+                        found = t;
                         break;
                     }
                 }
@@ -163,32 +162,26 @@
             return result;
         }
 
-        // Web Audio Buffer အဖြစ် ရွေးချယ်ထားသော Style Folder ထဲမှ Load လုပ်မည်
-        async function loadAudioBuffer(name, style) {
-            const extensions = [".wav", ".mp3", ".m4a", ".ogg"];
+        // Web Audio Buffer အဖြစ် pao_audio_XXXX.wav ကို Load လုပ်မည်
+        async function loadAudioBuffer(filename, style) {
+            let url = `${basePath}${style}/${filename}`;
 
-            for (let ext of extensions) {
-                // audio/<style>/<filename> လမ်းကြောင်းအလိုက် ညွှန်းခြင်း
-                let url = `${basePath}${style}/${encodeURIComponent(name)}${ext}`;
-
-                if (audioCache.has(url)) {
-                    return audioCache.get(url);
-                }
-
-                try {
-                    let res = await fetch(url);
-                    if (res.ok) {
-                        let arrayBuffer = await res.arrayBuffer();
-                        let decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
-                        audioCache.set(url, decodedBuffer);
-                        return decodedBuffer;
-                    }
-                } catch (e) { }
+            if (audioCache.has(url)) {
+                return audioCache.get(url);
             }
+
+            try {
+                let res = await fetch(url);
+                if (res.ok) {
+                    let arrayBuffer = await res.arrayBuffer();
+                    let decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
+                    audioCache.set(url, decodedBuffer);
+                    return decodedBuffer;
+                }
+            } catch (e) { }
             return null;
         }
 
-        // အဓိက အသံဖတ်ပြပေးမည့် Function
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
@@ -207,13 +200,16 @@
             btn.disabled = true;
             status.innerText = "အသံဖိုင်များ စီစဉ်နေသည်...";
 
-            let words = smartSplit(text);
+            let matchedTranscripts = smartSplit(text);
             let buffers = [];
 
-            for (let word of words) {
-                let buffer = await loadAudioBuffer(word, style);
-                if (buffer) {
-                    buffers.push(buffer);
+            for (let tr of matchedTranscripts) {
+                let filename = metadataMap.get(tr);
+                if (filename) {
+                    let buffer = await loadAudioBuffer(filename, style);
+                    if (buffer) {
+                        buffers.push(buffer);
+                    }
                 }
             }
 
