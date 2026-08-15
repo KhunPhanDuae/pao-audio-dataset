@@ -6,20 +6,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pa'O TTS AI Generated Voice</title>
     <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #cccccc;
+            --input-bg: #ffffff;
+            --modal-bg: #ffffff;
+        }
+
+        /* Dark Theme Variables */
+        body.dark-mode {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --border-color: #444444;
+            --input-bg: #2a2a2a;
+            --modal-bg: #252525;
+        }
+
         body {
             font-family: Arial, sans-serif;
             max-width: 540px;
             margin: 20px auto;
             padding: 20px;
-            background: #f4f6f9;
+            background: var(--bg-color);
+            color: var(--text-color);
             text-align: center;
+            transition: background 0.3s, color 0.3s;
         }
 
         .card {
-            background: #ffffff;
+            background: var(--card-bg);
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             position: relative;
         }
 
@@ -32,11 +53,16 @@
 
         .header-bar h2 {
             margin: 0;
-            font-size: 20px;
-            color: #222;
+            font-size: 18px;
+            color: var(--text-color);
         }
 
-        .about-btn {
+        .header-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-btn, .about-btn {
             background: transparent;
             border: 1px solid #0066ff;
             color: #0066ff;
@@ -44,13 +70,11 @@
             border-radius: 6px;
             font-size: 13px;
             cursor: pointer;
-            margin: 0;
-            width: auto;
         }
 
-        .about-btn:hover {
-            background: #0066ff;
-            color: #fff;
+        body.dark-mode .icon-btn, body.dark-mode .about-btn {
+            border-color: #66a3ff;
+            color: #66a3ff;
         }
 
         .form-group {
@@ -61,41 +85,48 @@
         label {
             font-size: 14px;
             font-weight: bold;
-            color: #333;
+            color: var(--text-color);
             display: block;
             margin-bottom: 8px;
         }
 
-        textarea {
+        textarea, select {
             width: 100%;
-            height: 200px;
             padding: 12px;
             font-size: 12px;
-            line-height: 1.6;
             box-sizing: border-box;
-            border: 1px solid #ccc;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             outline: none;
-            background: #fff;
-            resize: vertical;
+            background: var(--input-bg);
+            color: var(--text-color);
             font-family: inherit;
+        }
+
+        textarea {
+            height: 200px;
+            line-height: 1.6;
+            resize: vertical;
             overflow-y: auto;
         }
 
-        textarea:focus {
-            border-color: #0066ff;
-            box-shadow: 0 0 5px rgba(0, 102, 255, 0.2);
+        /* Speed Slider Styling */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
 
-        select {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            outline: none;
-            background: #fff;
+        input[type="range"] {
+            flex-grow: 1;
+            accent-color: #0066ff;
+            cursor: pointer;
+        }
+
+        .speed-val {
+            font-weight: bold;
+            color: #0066ff;
+            min-width: 45px;
         }
 
         button.action-btn {
@@ -111,10 +142,6 @@
             cursor: pointer;
         }
 
-        button.action-btn:active {
-            background: #004bb5;
-        }
-
         button.action-btn:disabled {
             background: #aaa;
             cursor: not-allowed;
@@ -128,10 +155,10 @@
         #status {
             margin-top: 15px;
             font-weight: bold;
-            color: #444;
+            color: var(--text-color);
         }
 
-        /* Modal Popup Style */
+        /* Modal Popup */
         .modal {
             display: none;
             position: fixed;
@@ -139,14 +166,15 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.6);
             justify-content: center;
             align-items: center;
             z-index: 1000;
         }
 
         .modal-content {
-            background: white;
+            background: var(--modal-bg);
+            color: var(--text-color);
             padding: 25px;
             border-radius: 12px;
             max-width: 440px;
@@ -158,12 +186,6 @@
         .modal-content h3 {
             margin-top: 0;
             color: #0066ff;
-        }
-
-        .modal-content p {
-            font-size: 14px;
-            line-height: 1.6;
-            color: #444;
         }
 
         .modal-close {
@@ -184,7 +206,10 @@
     <div class="card">
         <div class="header-bar">
             <h2>Pa'O TTS AI Generated Voice</h2>
-            <button class="about-btn" onclick="openModal()">အကြောင်းအရာ</button>
+            <div class="header-btns">
+                <button class="icon-btn" onclick="toggleTheme()" id="themeBtn">🌙 Dark</button>
+                <button class="about-btn" onclick="openModal()">အကြောင်း</button>
+            </div>
         </div>
 
         <div class="form-group">
@@ -201,6 +226,15 @@
             </select>
         </div>
 
+        <!-- အသံ အနှေး/အမြန် Slider Setting -->
+        <div class="form-group">
+            <label for="speedSlider">အသံ အနှေး/အမြန် ချိန်ညှိရန်:</label>
+            <div class="slider-container">
+                <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeedLabel(this.value)">
+                <span id="speedVal" class="speed-val">1.0x</span>
+            </div>
+        </div>
+
         <button id="playBtn" class="action-btn" onclick="playText()">အသံဖတ်ရန်</button>
         <button id="downloadBtn" class="action-btn download-btn" onclick="downloadAudio()">အသံဖိုင် ဒေါင်းလုဒ်ဆွဲရန် (.wav)</button>
 
@@ -211,15 +245,9 @@
     <div id="aboutModal" class="modal">
         <div class="modal-content">
             <h3>ဖန်တီးမှု နောက်ခံအကြောင်း</h3>
-            <p>
-                ကျွန်တော်တို့သည် ပအိုဝ်းဘာသာစကား တိုးတက်ရေးအတွက် အဓိက လိုအပ်သော ဒေတာစု (Dataset) တစ်ခုကို စနစ်တကျ တည်ဆောက်လျက်ရှိပါသည်။
-            </p>
-            <p>
-                ဤ <strong>Pa'O TTS AI Generated Voice</strong> စနစ်ကို <strong>Pa'O Digital Hub</strong> မှ ဖန်တီးရေးသားပေးထားခြင်း ဖြစ်ပါသည်။
-            </p>
-            <p>
-                အဆိုပါ Pa'O Digital Hub သည်လည်း <strong>SuccessImprove Project</strong> အောက်တွင် တည်ရှိပြီး၊ SuccessImprove ကို ဗဟိုပြုအဖွဲ့အစည်းဖြစ်သည့် <strong>RYPAK</strong> မှ ဦးဆောင်၍ ဖန်တီးလည်ပတ်ပေးထားခြင်း ဖြစ်ပါသည်။
-            </p>
+            <p>ကျွန်တော်တို့သည် ပအိုဝ်းဘာသာစကား တိုးတက်ရေးအတွက် အဓိက လိုအပ်သော ဒေတာစု (Dataset) တစ်ခုကို စနစ်တကျ တည်ဆောက်လျက်ရှိပါသည်။</p>
+            <p>ဤ <strong>Pa'O TTS AI Generated Voice</strong> စနစ်ကို <strong>Pa'O Digital Hub</strong> မှ ဖန်တီးရေးသားပေးထားခြင်း ဖြစ်ပါသည်။</p>
+            <p>အဆိုပါ Pa'O Digital Hub သည်လည်း <strong>SuccessImprove Project</strong> အောက်တွင် တည်ရှိပြီး၊ SuccessImprove ကို ဗဟိုပြုအဖွဲ့အစည်းဖြစ်သည့် <strong>RYPAK</strong> မှ ဦးဆောင်၍ ဖန်တီးလည်ပတ်ပေးထားခြင်း ဖြစ်ပါသည်။</p>
             <button class="modal-close" onclick="closeModal()">ပိတ်မည်</button>
         </div>
     </div>
@@ -236,13 +264,25 @@
         let mediaRecorder = null;
         let audioBlob = null;
 
+        // Theme Toggle Logic
+        function toggleTheme() {
+            document.body.classList.toggle("dark-mode");
+            const btn = document.getElementById("themeBtn");
+            if (document.body.classList.contains("dark-mode")) {
+                btn.innerText = "☀️ Light";
+            } else {
+                btn.innerText = "🌙 Dark";
+            }
+        }
+
+        // Speed Label Update
+        function updateSpeedLabel(val) {
+            document.getElementById("speedVal").innerText = parseFloat(val).toFixed(1) + "x";
+        }
+
         // Modal Controls
-        function openModal() {
-            document.getElementById("aboutModal").style.display = "flex";
-        }
-        function closeModal() {
-            document.getElementById("aboutModal").style.display = "none";
-        }
+        function openModal() { document.getElementById("aboutModal").style.display = "flex"; }
+        function closeModal() { document.getElementById("aboutModal").style.display = "none"; }
 
         async function initEngine() {
             try {
@@ -304,12 +344,8 @@
             let start = 0;
             let end = pcm.length - 1;
 
-            while (start < pcm.length && Math.abs(pcm[start]) < threshold) {
-                start++;
-            }
-            while (end > start && Math.abs(pcm[end]) < threshold) {
-                end--;
-            }
+            while (start < pcm.length && Math.abs(pcm[start]) < threshold) start++;
+            while (end > start && Math.abs(pcm[end]) < threshold) end--;
 
             let trimmedLen = end - start + 1;
             if (trimmedLen <= 0) return buffer;
@@ -324,10 +360,7 @@
 
         async function fetchAudioBuffer(filename, style) {
             let url = `${basePath}${style}/${filename}`;
-
-            if (audioCache.has(url)) {
-                return audioCache.get(url);
-            }
+            if (audioCache.has(url)) return audioCache.get(url);
 
             try {
                 let res = await fetch(url);
@@ -345,6 +378,7 @@
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
+            let speed = parseFloat(document.getElementById("speedSlider").value);
             let status = document.getElementById("status");
             let btn = document.getElementById("playBtn");
             let downloadBtn = document.getElementById("downloadBtn");
@@ -364,7 +398,6 @@
             recordedChunks = [];
 
             let matchedWords = smartMatchSplit(text);
-            
             let fetchPromises = matchedWords.map(w => {
                 let fn = textToFilenameMap.get(w);
                 return fn ? fetchAudioBuffer(fn, style) : Promise.resolve(null);
@@ -395,11 +428,14 @@
             mediaRecorder.start();
 
             let startTime = ctx.currentTime + 0.02;
-            const balancedOverlap = 0.09;
+            const balancedOverlap = 0.09 / speed; // Speed ပြောင်းလဲမှုပေါ် မူတည်ပြီး overlap ကိုပါ ချိန်ညှိခြင်း
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
                 source.buffer = buffer;
+
+                // Speed Slider မှ Speed တန်ဖိုးကို AudioSource သို့ ထည့်သွင်းခြင်း
+                source.playbackRate.value = speed;
 
                 source.connect(ctx.destination);
                 source.connect(dest);
@@ -407,7 +443,9 @@
                 let playAt = (index === 0) ? startTime : startTime - balancedOverlap;
                 source.start(playAt);
 
-                startTime = playAt + buffer.duration;
+                // Speed ကြောင့် အသံကြာချိန် (Duration) တို/ရှည် ပြောင်းသွားသည်ကို တွက်ချက်ခြင်း
+                let effectiveDuration = buffer.duration / speed;
+                startTime = playAt + effectiveDuration;
             });
 
             let totalDurationMs = (startTime - ctx.currentTime) * 1000;
