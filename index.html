@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pa'O Smart Voice Engine (Ultra Fast)</title>
+    <title>Pa'O Smart Voice Engine (Flexible Combiner)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -82,8 +82,8 @@
         <h2>Pa'O Smart Audio Reader</h2>
 
         <div class="form-group">
-            <label for="text">စာသားော ရိုက်ထည့်ပါ:</label>
-            <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - ခွဲးဟောဝ်ဒျာႏ မင်္ဂလာႏဒျာႏ)">
+            <label for="text">စာသားဂ ရိုက်ထည့်ပါ:</label>
+            <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - ဝွေꩻယိုနောဝ်ꩻ သို့မဟုတ် ဝွေꩻ ယို နောဝ်ꩻ)">
         </div>
 
         <div class="form-group">
@@ -103,13 +103,12 @@
     <script>
         const basePath = "./audio/";
         
-        // Fast Lookup Hash Map
         let textToFilenameMap = new Map();
         let sortedTranscripts = [];
         let audioCache = new Map();
         let ctx = null;
 
-        // ၁။ CSV ဖတ်ပြီးသည်နှင့် O(1) Search ရအောင် Hash Indexing ချက်ချင်း ဆောက်မည်
+        // ၁။ CSV ဖတ်ပြီး Index ဆောက်ခြင်း
         async function initEngine() {
             try {
                 let res = await fetch("metadata.csv");
@@ -132,6 +131,7 @@
                             }
                         }
                     }
+                    // အရှည်ဆုံး စကားလုံးများ အရင် လာအောင် စီမည်
                     sortedTranscripts.sort((a, b) => b.length - a.length);
                     document.getElementById("status").innerText = "အသင့်ဖြစ်ပါပြီ";
                 }
@@ -141,39 +141,35 @@
             }
         }
 
-        // ၂။ High-Speed Split Logic
-        function fastSplit(text) {
-            text = text.replace(/\s+/g, "");
-            let result = [];
+        // ၂။ Bidirectional Smart Matching Algorithm
+        // (စာသား ခွဲရေးရေး၊ ကပ်ရေးရေး အသံဖိုင်ရှိရာကို အလိုအလျောက် ပေါင်း/ခွဲ ရှာပေးခြင်း)
+        function smartMatchSplit(text) {
+            let rawText = text.replace(/\s+/g, "");
+            let tokens = [];
 
-            while (text.length > 0) {
-                // Direct Exact Match ပါက တိုက်ရိုက်ယူမည် (O(1))
-                if (textToFilenameMap.has(text)) {
-                    result.push(text);
-                    break;
-                }
+            while (rawText.length > 0) {
+                let matched = "";
 
-                let found = "";
-                for (let i = 0; i < sortedTranscripts.length; i++) {
-                    let t = sortedTranscripts[i];
-                    if (text.startsWith(t)) {
-                        found = t;
+                // Metadata ထဲရှိ အရှည်ဆုံး စကားလုံး သို့မဟုတ် စကားစုနှင့် အရင် တိုက်ဆိုင်မှု ရှာမည်
+                for (let t of sortedTranscripts) {
+                    if (rawText.startsWith(t)) {
+                        matched = t;
                         break;
                     }
                 }
 
-                if (found) {
-                    result.push(found);
-                    text = text.substring(found.length);
+                if (matched) {
+                    tokens.push(matched);
+                    rawText = rawText.substring(matched.length);
                 } else {
-                    result.push(text[0]);
-                    text = text.substring(1);
+                    tokens.push(rawText[0]);
+                    rawText = rawText.substring(1);
                 }
             }
-            return result;
+            return tokens;
         }
 
-        // ၃။ Audio Fetching & Cache Management
+        // ၃။ Audio Fetching & RAM Cache
         async function fetchAudioBuffer(filename, style) {
             let url = `${basePath}${style}/${filename}`;
 
@@ -193,7 +189,7 @@
             return null;
         }
 
-        // ၄။ Instant Sound Playback (Parallel Execution)
+        // ၄။ Instant Audio Playback (Parallel Execution)
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
@@ -211,10 +207,10 @@
 
             btn.disabled = true;
 
-            let words = fastSplit(text);
+            // စာသားကို Smart Match Algorithm ဖြင့် အလိုအလျောက် စီမံမည်
+            let matchedWords = smartMatchSplit(text);
             
-            // Promise.all ဖြင့် အသံဖိုင်အားလုံးကို တစ်ပြိုင်နက်တည်း Parallel ဆွဲယူမည်
-            let fetchPromises = words.map(w => {
+            let fetchPromises = matchedWords.map(w => {
                 let fn = textToFilenameMap.get(w);
                 return fn ? fetchAudioBuffer(fn, style) : Promise.resolve(null);
             });
@@ -230,7 +226,7 @@
             status.innerText = "ဖွင့်နေသည်...";
 
             let currentTime = ctx.currentTime;
-            const overlap = 0.04; // Smooth crossfade (40ms)
+            const overlap = 0.04; // 40ms overlap ဖြင့် အသံချောမောစွာ ဆက်သွားမည်
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
