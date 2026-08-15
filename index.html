@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pa'O Smart Voice Engine</title>
+    <title>Pa'O Smart Voice Engine (Ultra Fast)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -82,8 +82,8 @@
         <h2>Pa'O Smart Audio Reader</h2>
 
         <div class="form-group">
-            <label for="text">စာသား ဝရိုက်ထည့်ပါ:</label>
-            <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - ခွဲးဟောဝ်ဒျာႏ မင်္ဂလာႏဒျာႏ နာꩻမဉ်ꩻတမုဲင်ꩻ)">
+            <label for="text">စာသားော ရိုက်ထည့်ပါ:</label>
+            <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - ခွဲးဟောဝ်ဒျာႏ မင်္ဂလာႏဒျာႏ)">
         </div>
 
         <div class="form-group">
@@ -97,18 +97,20 @@
 
         <button id="playBtn" onclick="playText()">အသံဖတ်ရန်</button>
 
-        <div id="status">အသင့်ဖြစ်ပါပြီ</div>
+        <div id="status">အချက်အလက်များ ပြင်ဆင်နေသည်...</div>
     </div>
 
     <script>
         const basePath = "./audio/";
-        let metadataMap = new Map();
-        let transcriptList = [];
+        
+        // Fast Lookup Hash Map
+        let textToFilenameMap = new Map();
+        let sortedTranscripts = [];
         let audioCache = new Map();
-        let ctx;
+        let ctx = null;
 
-        // metadata.csv ကို ဖတ်ပြီး Data Map လုပ်ခြင်း
-        async function loadMetadata() {
+        // ၁။ CSV ဖတ်ပြီးသည်နှင့် O(1) Search ရအောင် Hash Indexing ချက်ချင်း ဆောက်မည်
+        async function initEngine() {
             try {
                 let res = await fetch("metadata.csv");
                 if (res.ok) {
@@ -116,36 +118,44 @@
                     let lines = text.split("\n");
 
                     for (let i = 1; i < lines.length; i++) {
-                        let cols = lines[i].split(",");
+                        let line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        let cols = line.split(",");
                         if (cols.length >= 2) {
                             let filename = cols[0].trim();
                             let transcript = cols[1].trim();
 
                             if (filename && transcript) {
-                                metadataMap.set(transcript, filename);
-                                transcriptList.push(transcript);
+                                textToFilenameMap.set(transcript, filename);
+                                sortedTranscripts.push(transcript);
                             }
                         }
                     }
-                    // အရှည်ဆုံး စကားလုံးများ အရင် ကိုက်ညီအောင် စီစဉ်ခြင်း
-                    transcriptList.sort((a, b) => b.length - a.length);
+                    sortedTranscripts.sort((a, b) => b.length - a.length);
+                    document.getElementById("status").innerText = "အသင့်ဖြစ်ပါပြီ";
                 }
             } catch (e) {
-                console.error("metadata.csv ဖတ်မရပါ:", e);
+                console.error("Metadata load error:", e);
+                document.getElementById("status").innerText = "အသင့်ဖြစ်ပါပြီ";
             }
         }
 
-        window.addEventListener("DOMContentLoaded", loadMetadata);
-
-        // စာသားထဲရှိ Space များကို ရှင်းထုတ်ပြီး မူလအက္ခရာ/စကားလုံးအလိုက် ခွဲထုတ်ခြင်း
-        function smartSplit(text) {
-            // Space များကို ရှင်းထုတ်မည် (Space ဘယ်လောက်ပါပါ စကားဆက်တိုက်ဖြစ်စေရန်)
+        // ၂။ High-Speed Split Logic
+        function fastSplit(text) {
             text = text.replace(/\s+/g, "");
-
             let result = [];
+
             while (text.length > 0) {
+                // Direct Exact Match ပါက တိုက်ရိုက်ယူမည် (O(1))
+                if (textToFilenameMap.has(text)) {
+                    result.push(text);
+                    break;
+                }
+
                 let found = "";
-                for (let t of transcriptList) {
+                for (let i = 0; i < sortedTranscripts.length; i++) {
+                    let t = sortedTranscripts[i];
                     if (text.startsWith(t)) {
                         found = t;
                         break;
@@ -156,16 +166,15 @@
                     result.push(found);
                     text = text.substring(found.length);
                 } else {
-                    let char = text[0];
-                    result.push(char);
+                    result.push(text[0]);
                     text = text.substring(1);
                 }
             }
             return result;
         }
 
-        // Web Audio Buffer Load ပြုလုပ်ခြင်း
-        async function loadAudioBuffer(filename, style) {
+        // ၃။ Audio Fetching & Cache Management
+        async function fetchAudioBuffer(filename, style) {
             let url = `${basePath}${style}/${filename}`;
 
             if (audioCache.has(url)) {
@@ -184,6 +193,7 @@
             return null;
         }
 
+        // ၄။ Instant Sound Playback (Parallel Execution)
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
@@ -200,20 +210,16 @@
             }
 
             btn.disabled = true;
-            status.innerText = "အသံဖိုင်များ စီစဉ်နေသည်...";
 
-            let matchedTranscripts = smartSplit(text);
-            let buffers = [];
+            let words = fastSplit(text);
+            
+            // Promise.all ဖြင့် အသံဖိုင်အားလုံးကို တစ်ပြိုင်နက်တည်း Parallel ဆွဲယူမည်
+            let fetchPromises = words.map(w => {
+                let fn = textToFilenameMap.get(w);
+                return fn ? fetchAudioBuffer(fn, style) : Promise.resolve(null);
+            });
 
-            for (let tr of matchedTranscripts) {
-                let filename = metadataMap.get(tr);
-                if (filename) {
-                    let buffer = await loadAudioBuffer(filename, style);
-                    if (buffer) {
-                        buffers.push(buffer);
-                    }
-                }
-            }
+            let buffers = (await Promise.all(fetchPromises)).filter(b => b !== null);
 
             if (buffers.length === 0) {
                 status.innerText = "အသံမတွေ့ပါ";
@@ -224,20 +230,15 @@
             status.innerText = "ဖွင့်နေသည်...";
 
             let currentTime = ctx.currentTime;
-            
-            // ⚠️ သဘာဝကျကျ အသံတစ်ခု မပြီးခင် နောက်တစ်ခု ထပ်စေရန် overlap ချိန်ညှိချက် (0.05 စက္ကန့် = 50ms)
-            const overlap = 0.05; 
+            const overlap = 0.04; // Smooth crossfade (40ms)
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
                 source.buffer = buffer;
                 source.connect(ctx.destination);
 
-                // ပထမအသံ မဟုတ်ပါက overlap နှုတ်ပြီး ရှေ့တိုး ဖွင့်ပေးမည်
                 let startTime = (index === 0) ? currentTime : currentTime - overlap;
                 source.start(startTime);
-
-                // တကယ်ကုန်ဆုံးမည့် အချိန်ကို တွက်ချက်ခြင်း
                 currentTime = startTime + buffer.duration;
             });
 
@@ -247,6 +248,8 @@
                 btn.disabled = false;
             }, totalTimeMs);
         }
+
+        window.addEventListener("DOMContentLoaded", initEngine);
     </script>
 
 </body>
