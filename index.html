@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pa'O Smart Audio Reader</title>
+    <title>Pa'O Smart Audio Reader & Downloader</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -35,12 +35,11 @@
             margin-bottom: 8px;
         }
 
-        /* Textarea Style ပြင်ဆင်ထားမှု */
         textarea {
             width: 100%;
-            height: 140px;
+            height: 200px;
             padding: 12px;
-            font-size: 16px;
+            font-size: 12px;
             line-height: 1.6;
             box-sizing: border-box;
             border: 1px solid #ccc;
@@ -90,6 +89,15 @@
             cursor: not-allowed;
         }
 
+        .download-btn {
+            background: #28a745;
+            display: none;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+        }
+
         #status {
             margin-top: 15px;
             font-weight: bold;
@@ -101,11 +109,11 @@
 <body>
 
     <div class="card">
-        <h2>Pa'O Smart Audio Reader</h2>
+        <h2>Pa'O Smart Audio Reader & Downloader</h2>
 
         <div class="form-group">
             <label for="text">စာသား သို့မဟုတ် ပုံပြင်တိုများ ရိုက်ထည့်ပါ:</label>
-            <textarea id="text" rows="5" placeholder="ဒီနေရာတွင် စာပုဒ်ရှည်၊ ဆောင်းပါး သို့မဟုတ် ပုံပြင်တိုများကို စိတ်ကြိုက် ရိုက်ထည့်နိုင်ပါသည်..."></textarea>
+            <textarea id="text" rows="5" placeholder="ဒီနေရာတွင် စာသားများ ရိုက်ထည့်ပါ..."></textarea>
         </div>
 
         <div class="form-group">
@@ -118,6 +126,7 @@
         </div>
 
         <button id="playBtn" onclick="playText()">အသံဖတ်ရန်</button>
+        <button id="downloadBtn" class="download-btn" onclick="downloadAudio()">အသံဖိုင် ဒေါင်းလုဒ်ဆွဲရန် (.wav)</button>
 
         <div id="status">အချက်အလက်များ ပြင်ဆင်နေသည်...</div>
     </div>
@@ -129,6 +138,10 @@
         let sortedTranscripts = [];
         let audioCache = new Map();
         let ctx = null;
+
+        let recordedChunks = [];
+        let mediaRecorder = null;
+        let audioBlob = null;
 
         async function initEngine() {
             try {
@@ -220,9 +233,7 @@
                 if (res.ok) {
                     let arrayBuffer = await res.arrayBuffer();
                     let rawBuffer = await ctx.decodeAudioData(arrayBuffer);
-                    
                     let cleanedBuffer = trimSilence(rawBuffer);
-                    
                     audioCache.set(url, cleanedBuffer);
                     return cleanedBuffer;
                 }
@@ -235,6 +246,7 @@
             let style = document.getElementById("audioStyle").value;
             let status = document.getElementById("status");
             let btn = document.getElementById("playBtn");
+            let downloadBtn = document.getElementById("downloadBtn");
 
             if (!text) return;
 
@@ -246,6 +258,9 @@
             }
 
             btn.disabled = true;
+            downloadBtn.style.display = "none";
+            audioBlob = null;
+            recordedChunks = [];
 
             let matchedWords = smartMatchSplit(text);
             
@@ -264,13 +279,31 @@
 
             status.innerText = "ဖွင့်နေသည်...";
 
+            // Stream Destination (အသံဖိုင် ဖမ်းယူရန်)
+            let dest = ctx.createMediaStreamDestination();
+            mediaRecorder = new MediaRecorder(dest.stream);
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: "audio/wav" });
+                downloadBtn.style.display = "block";
+            };
+
+            mediaRecorder.start();
+
             let startTime = ctx.currentTime + 0.02;
-            const balancedOverlap = 0.09; 
+            const balancedOverlap = 0.09;
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
                 source.buffer = buffer;
+
+                // Speaker နှင့် Recorder နှစ်ခုလုံးသို့ အသံပို့ပေးခြင်း
                 source.connect(ctx.destination);
+                source.connect(dest);
 
                 let playAt = (index === 0) ? startTime : startTime - balancedOverlap;
                 source.start(playAt);
@@ -279,10 +312,30 @@
             });
 
             let totalDurationMs = (startTime - ctx.currentTime) * 1000;
+
             setTimeout(() => {
-                status.innerText = "အသင့်ဖြစ်ပါပြီ";
+                mediaRecorder.stop();
+                status.innerText = "အသင့်ဖြစ်ပါပြီ (ဒေါင်းလုဒ်ဆွဲနိုင်ပါပြီ)";
                 btn.disabled = false;
             }, totalDurationMs);
+        }
+
+        // အသံဖိုင် ဒေါင်းလုဒ်ဆွဲသည့် Function
+        function downloadAudio() {
+            if (!audioBlob) return;
+
+            let url = URL.createObjectURL(audioBlob);
+            let a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = "pao_audio.wav";
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
         }
 
         window.addEventListener("DOMContentLoaded", initEngine);
