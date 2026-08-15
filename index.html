@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pa'O Ultra-Seamless Voice Engine</title>
+    <title>Pa'O Smart Audio Reader</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -140,7 +140,7 @@
             }
         }
 
-        // ၂။ Dynamic Split Strategy
+        // ၂။ Dynamic Split Matching
         function smartMatchSplit(text) {
             let rawText = text.replace(/\s+/g, "");
             let tokens = [];
@@ -165,17 +165,15 @@
             return tokens;
         }
 
-        // ၃။ အသံဖိုင်မှ Silence (အသံတိတ်ပိုင်း) များကို အလိုအလျောက် ဖြတ်ထုတ်ပေးမည့် Auto-Trimmer
+        // ၃။ Auto-Trimmer (အသံတိတ်ပိုင်းများ ဖယ်ထုတ်ခြင်း)
         function trimSilence(buffer, threshold = 0.008) {
             let pcm = buffer.getChannelData(0);
             let start = 0;
             let end = pcm.length - 1;
 
-            // အစပိုင်း အသံတိတ်ဖြတ်မည်
             while (start < pcm.length && Math.abs(pcm[start]) < threshold) {
                 start++;
             }
-            // အဆုံးပိုင်း အသံတိတ်ဖြတ်မည်
             while (end > start && Math.abs(pcm[end]) < threshold) {
                 end--;
             }
@@ -191,7 +189,7 @@
             return trimmedBuffer;
         }
 
-        // ၄။ Fetch & Auto Trim Audio
+        // ၄။ Fetch & Clean Audio Buffer
         async function fetchAudioBuffer(filename, style) {
             let url = `${basePath}${style}/${filename}`;
 
@@ -205,7 +203,6 @@
                     let arrayBuffer = await res.arrayBuffer();
                     let rawBuffer = await ctx.decodeAudioData(arrayBuffer);
                     
-                    // အသံတိတ်ပိုင်းများ ရှင်းထုတ်ခြင်း
                     let cleanedBuffer = trimSilence(rawBuffer);
                     
                     audioCache.set(url, cleanedBuffer);
@@ -215,7 +212,7 @@
             return null;
         }
 
-        // ၅။ Playback Engine (Aggressive Continuous Overlap)
+        // ၅။ Dynamic Playback Scheduler
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
@@ -252,16 +249,15 @@
 
             let startTime = ctx.currentTime + 0.02;
             
-            // ⚠️ မပြတ်စေရန် တိုးမြှင့်ထားသော Overlap တန်ဖိုး (0.18 စက္ကန့် = 180ms)
-            // လိုအပ်ပါက 0.20 သို့မဟုတ် 0.22 ထိ စမ်းသပ်တိုးမြှင့်နိုင်ပါသည်
-            const aggressiveOverlap = 0.18; 
+            // 💡 အသံဆက်တာ ပိုမို ငြိမ့်ညောင်းသွားစေရန် Overlap ကို 0.09s (90ms) သို့ ပြန်ညှိထားပါသည်
+            const balancedOverlap = 0.09; 
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
                 source.buffer = buffer;
                 source.connect(ctx.destination);
 
-                let playAt = (index === 0) ? startTime : startTime - aggressiveOverlap;
+                let playAt = (index === 0) ? startTime : startTime - balancedOverlap;
                 source.start(playAt);
 
                 startTime = playAt + buffer.duration;
