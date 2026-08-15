@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pa'O Continuous Seamless Audio Engine</title>
+    <title>Pa'O Ultra-Seamless Voice Engine</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -79,7 +79,7 @@
 <body>
 
     <div class="card">
-        <h2>Pa'O Seamless Audio Reader</h2>
+        <h2>Pa'O Smart Audio Reader</h2>
 
         <div class="form-group">
             <label for="text">စာသား ရိုက်ထည့်ပါ:</label>
@@ -108,7 +108,7 @@
         let audioCache = new Map();
         let ctx = null;
 
-        // ၁။ CSV Metadata Indexing
+        // ၁။ CSV Indexing
         async function initEngine() {
             try {
                 let res = await fetch("metadata.csv");
@@ -140,7 +140,7 @@
             }
         }
 
-        // ၂။ Dynamic Matching Logic
+        // ၂။ Dynamic Split Strategy
         function smartMatchSplit(text) {
             let rawText = text.replace(/\s+/g, "");
             let tokens = [];
@@ -165,7 +165,33 @@
             return tokens;
         }
 
-        // ၃။ Audio Fetching with Memory Cache
+        // ၃။ အသံဖိုင်မှ Silence (အသံတိတ်ပိုင်း) များကို အလိုအလျောက် ဖြတ်ထုတ်ပေးမည့် Auto-Trimmer
+        function trimSilence(buffer, threshold = 0.008) {
+            let pcm = buffer.getChannelData(0);
+            let start = 0;
+            let end = pcm.length - 1;
+
+            // အစပိုင်း အသံတိတ်ဖြတ်မည်
+            while (start < pcm.length && Math.abs(pcm[start]) < threshold) {
+                start++;
+            }
+            // အဆုံးပိုင်း အသံတိတ်ဖြတ်မည်
+            while (end > start && Math.abs(pcm[end]) < threshold) {
+                end--;
+            }
+
+            let trimmedLen = end - start + 1;
+            if (trimmedLen <= 0) return buffer;
+
+            let trimmedBuffer = ctx.createBuffer(buffer.numberOfChannels, trimmedLen, buffer.sampleRate);
+            for (let c = 0; c < buffer.numberOfChannels; c++) {
+                let channelData = buffer.getChannelData(c);
+                trimmedBuffer.getChannelData(c).set(channelData.subarray(start, end + 1));
+            }
+            return trimmedBuffer;
+        }
+
+        // ၄။ Fetch & Auto Trim Audio
         async function fetchAudioBuffer(filename, style) {
             let url = `${basePath}${style}/${filename}`;
 
@@ -177,15 +203,19 @@
                 let res = await fetch(url);
                 if (res.ok) {
                     let arrayBuffer = await res.arrayBuffer();
-                    let decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
-                    audioCache.set(url, decodedBuffer);
-                    return decodedBuffer;
+                    let rawBuffer = await ctx.decodeAudioData(arrayBuffer);
+                    
+                    // အသံတိတ်ပိုင်းများ ရှင်းထုတ်ခြင်း
+                    let cleanedBuffer = trimSilence(rawBuffer);
+                    
+                    audioCache.set(url, cleanedBuffer);
+                    return cleanedBuffer;
                 }
             } catch (e) { }
             return null;
         }
 
-        // ၄။ Continuous Audio Stitching Engine (အသံမရပ်ဘဲ ဆက်တိုက်ဖွင့်ပေးမည့် စနစ်)
+        // ၅။ Playback Engine (Aggressive Continuous Overlap)
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
@@ -220,24 +250,20 @@
 
             status.innerText = "ဖွင့်နေသည်...";
 
-            // Seamless Scheduler Logic
-            let startTime = ctx.currentTime + 0.05; // 50ms warm-up delay
-            const crossFadeOverlap = 0.08; // 80ms Overlap ဖြင့် အသံဖိုင်တစ်ခုနှင့်တစ်ခု ကြိုတင်ဆက်ပေးမည်
+            let startTime = ctx.currentTime + 0.02;
+            
+            // ⚠️ မပြတ်စေရန် တိုးမြှင့်ထားသော Overlap တန်ဖိုး (0.18 စက္ကန့် = 180ms)
+            // လိုအပ်ပါက 0.20 သို့မဟုတ် 0.22 ထိ စမ်းသပ်တိုးမြှင့်နိုင်ပါသည်
+            const aggressiveOverlap = 0.18; 
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
-                let gainNode = ctx.createGain();
-
                 source.buffer = buffer;
-                source.connect(gainNode);
-                gainNode.connect(ctx.destination);
+                source.connect(ctx.destination);
 
-                // အသံစတင်မည့်အချိန်ကို Overlap နှုတ်၍ ဆက်တိုက် တိကျစွာ သတ်မှတ်ပေးခြင်း
-                let playAt = (index === 0) ? startTime : startTime - crossFadeOverlap;
-                
+                let playAt = (index === 0) ? startTime : startTime - aggressiveOverlap;
                 source.start(playAt);
 
-                // နောက်အသံဖိုင် စတင်မည့် အချိန်ကို အတိအကျ တွက်ချက်ခြင်း
                 startTime = playAt + buffer.duration;
             });
 
