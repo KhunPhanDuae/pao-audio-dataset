@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="my">
+<html lang="blk">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pa'O Smart Audio Reader & Downloader</title>
+    <title>Pa'O TTS AI Generated Voice</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -20,6 +20,37 @@
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            position: relative;
+        }
+
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .header-bar h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #222;
+        }
+
+        .about-btn {
+            background: transparent;
+            border: 1px solid #0066ff;
+            color: #0066ff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin: 0;
+            width: auto;
+        }
+
+        .about-btn:hover {
+            background: #0066ff;
+            color: #fff;
         }
 
         .form-group {
@@ -67,7 +98,7 @@
             background: #fff;
         }
 
-        button {
+        button.action-btn {
             width: 100%;
             padding: 12px;
             margin-top: 15px;
@@ -80,22 +111,18 @@
             cursor: pointer;
         }
 
-        button:active {
+        button.action-btn:active {
             background: #004bb5;
         }
 
-        button:disabled {
+        button.action-btn:disabled {
             background: #aaa;
             cursor: not-allowed;
         }
 
         .download-btn {
-            background: #28a745;
+            background: #28a745 !important;
             display: none;
-        }
-
-        .download-btn:hover {
-            background: #218838;
         }
 
         #status {
@@ -103,13 +130,62 @@
             font-weight: bold;
             color: #444;
         }
+
+        /* Modal Popup Style */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 440px;
+            width: 90%;
+            text-align: left;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            color: #0066ff;
+        }
+
+        .modal-content p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #444;
+        }
+
+        .modal-close {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            float: right;
+            margin-top: 10px;
+        }
     </style>
 </head>
 
 <body>
 
     <div class="card">
-        <h2>Pa'O Smart Audio Reader & Downloader</h2>
+        <div class="header-bar">
+            <h2>Pa'O TTS AI Generated Voice</h2>
+            <button class="about-btn" onclick="openModal()">အကြောင်းအရာ</button>
+        </div>
 
         <div class="form-group">
             <label for="text">စာသား သို့မဟုတ် ပုံပြင်တိုများ ရိုက်ထည့်ပါ:</label>
@@ -125,10 +201,27 @@
             </select>
         </div>
 
-        <button id="playBtn" onclick="playText()">အသံဖတ်ရန်</button>
-        <button id="downloadBtn" class="download-btn" onclick="downloadAudio()">အသံဖိုင် ဒေါင်းလုဒ်ဆွဲရန် (.wav)</button>
+        <button id="playBtn" class="action-btn" onclick="playText()">အသံဖတ်ရန်</button>
+        <button id="downloadBtn" class="action-btn download-btn" onclick="downloadAudio()">အသံဖိုင် ဒေါင်းလုဒ်ဆွဲရန် (.wav)</button>
 
         <div id="status">အချက်အလက်များ ပြင်ဆင်နေသည်...</div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <h3>ဖန်တီးမှု နောက်ခံအကြောင်း</h3>
+            <p>
+                ကျွန်တော်တို့သည် ပအိုဝ်းဘာသာစကား တိုးတက်ရေးအတွက် အဓိက လိုအပ်သော ဒေတာစု (Dataset) တစ်ခုကို စနစ်တကျ တည်ဆောက်လျက်ရှိပါသည်။
+            </p>
+            <p>
+                ဤ <strong>Pa'O TTS AI Generated Voice</strong> စနစ်ကို <strong>Pa'O Digital Hub</strong> မှ ဖန်တီးရေးသားပေးထားခြင်း ဖြစ်ပါသည်။
+            </p>
+            <p>
+                အဆိုပါ Pa'O Digital Hub သည်လည်း <strong>SuccessImprove Project</strong> အောက်တွင် တည်ရှိပြီး၊ SuccessImprove ကို ဗဟိုပြုအဖွဲ့အစည်းဖြစ်သည့် <strong>RYPAK</strong> မှ ဦးဆောင်၍ ဖန်တီးလည်ပတ်ပေးထားခြင်း ဖြစ်ပါသည်။
+            </p>
+            <button class="modal-close" onclick="closeModal()">ပိတ်မည်</button>
+        </div>
     </div>
 
     <script>
@@ -142,6 +235,14 @@
         let recordedChunks = [];
         let mediaRecorder = null;
         let audioBlob = null;
+
+        // Modal Controls
+        function openModal() {
+            document.getElementById("aboutModal").style.display = "flex";
+        }
+        function closeModal() {
+            document.getElementById("aboutModal").style.display = "none";
+        }
 
         async function initEngine() {
             try {
@@ -279,7 +380,6 @@
 
             status.innerText = "ဖွင့်နေသည်...";
 
-            // Stream Destination (အသံဖိုင် ဖမ်းယူရန်)
             let dest = ctx.createMediaStreamDestination();
             mediaRecorder = new MediaRecorder(dest.stream);
 
@@ -301,7 +401,6 @@
                 let source = ctx.createBufferSource();
                 source.buffer = buffer;
 
-                // Speaker နှင့် Recorder နှစ်ခုလုံးသို့ အသံပို့ပေးခြင်း
                 source.connect(ctx.destination);
                 source.connect(dest);
 
@@ -320,7 +419,6 @@
             }, totalDurationMs);
         }
 
-        // အသံဖိုင် ဒေါင်းလုဒ်ဆွဲသည့် Function
         function downloadAudio() {
             if (!audioBlob) return;
 
@@ -328,7 +426,7 @@
             let a = document.createElement("a");
             a.style.display = "none";
             a.href = url;
-            a.download = "pao_audio.wav";
+            a.download = "pa_o_tts_voice.wav";
             document.body.appendChild(a);
             a.click();
             
