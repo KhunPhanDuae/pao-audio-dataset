@@ -82,7 +82,7 @@
         <h2>Pa'O Smart Audio Reader</h2>
 
         <div class="form-group">
-            <label for="text">စာသား ရိုက်ထည့်ပါ:</label>
+            <label for="text">စာသား ဝရိုက်ထည့်ပါ:</label>
             <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - ခွဲးဟောဝ်ဒျာႏ မင်္ဂလာႏဒျာႏ နာꩻမဉ်ꩻတမုဲင်ꩻ)">
         </div>
 
@@ -107,7 +107,7 @@
         let audioCache = new Map();
         let ctx;
 
-        // metadata.csv ကို ဖတ်ပြီး စာသား နှင့် ဖိုင်နာမည်ကို Map ချိတ်ဆက်ခြင်း
+        // metadata.csv ကို ဖတ်ပြီး Data Map လုပ်ခြင်း
         async function loadMetadata() {
             try {
                 let res = await fetch("metadata.csv");
@@ -127,7 +127,7 @@
                             }
                         }
                     }
-
+                    // အရှည်ဆုံး စကားလုံးများ အရင် ကိုက်ညီအောင် စီစဉ်ခြင်း
                     transcriptList.sort((a, b) => b.length - a.length);
                 }
             } catch (e) {
@@ -137,15 +137,16 @@
 
         window.addEventListener("DOMContentLoaded", loadMetadata);
 
-        // Space များကို ရှင်းထုတ်ပြီး Smart Split ပြုလုပ်ခြင်း
-        function cleanAndSplit(text) {
-            let cleanedText = text.replace(/\s+/g, ''); // Space အားလုံးကို ဖယ်ထုတ်ခြင်း
+        // စာသားထဲရှိ Space များကို ရှင်းထုတ်ပြီး မူလအက္ခရာ/စကားလုံးအလိုက် ခွဲထုတ်ခြင်း
+        function smartSplit(text) {
+            // Space များကို ရှင်းထုတ်မည် (Space ဘယ်လောက်ပါပါ စကားဆက်တိုက်ဖြစ်စေရန်)
+            text = text.replace(/\s+/g, "");
+
             let result = [];
-            
-            while (cleanedText.length > 0) {
+            while (text.length > 0) {
                 let found = "";
                 for (let t of transcriptList) {
-                    if (cleanedText.startsWith(t)) {
+                    if (text.startsWith(t)) {
                         found = t;
                         break;
                     }
@@ -153,17 +154,17 @@
 
                 if (found) {
                     result.push(found);
-                    cleanedText = cleanedText.substring(found.length);
+                    text = text.substring(found.length);
                 } else {
-                    let char = cleanedText[0];
+                    let char = text[0];
                     result.push(char);
-                    cleanedText = cleanedText.substring(1);
+                    text = text.substring(1);
                 }
             }
             return result;
         }
 
-        // Web Audio Buffer ကို Load လုပ်ခြင်း
+        // Web Audio Buffer Load ပြုလုပ်ခြင်း
         async function loadAudioBuffer(filename, style) {
             let url = `${basePath}${style}/${filename}`;
 
@@ -183,7 +184,6 @@
             return null;
         }
 
-        // Overlapping Audio Engine (အသံ အထပ်အဆက် သဘာဝကျကျ ဖွင့်ပေးသည့် စနစ်)
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
@@ -202,7 +202,7 @@
             btn.disabled = true;
             status.innerText = "အသံဖိုင်များ စီစဉ်နေသည်...";
 
-            let matchedTranscripts = cleanAndSplit(text);
+            let matchedTranscripts = smartSplit(text);
             let buffers = [];
 
             for (let tr of matchedTranscripts) {
@@ -225,22 +225,20 @@
 
             let currentTime = ctx.currentTime;
             
-            // 💡 အသံ ၂ ခုကြား ထပ်ပေးမည့် အချိန် (OVERLAP TIME - 0.08 စက္ကန့်)
-            // ဒီတန်ဖိုးကို လိုအပ်သလို (0.05 မှ 0.1) အထိ ပြင်ဆင်နိုင်ပါတယ်
-            const OVERLAP_TIME = 0.08; 
+            // ⚠️ သဘာဝကျကျ အသံတစ်ခု မပြီးခင် နောက်တစ်ခု ထပ်စေရန် overlap ချိန်ညှိချက် (0.05 စက္ကန့် = 50ms)
+            const overlap = 0.05; 
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
                 source.buffer = buffer;
                 source.connect(ctx.destination);
-                source.start(currentTime);
 
-                // အသံတစ်ခု မပြီးမီ 0.08 စက္ကန့် စော၍ နောက်အသံကို ဆက်ဖွင့်ခြင်း
-                if (index < buffers.length - 1) {
-                    currentTime += Math.max(0, buffer.duration - OVERLAP_TIME);
-                } else {
-                    currentTime += buffer.duration;
-                }
+                // ပထမအသံ မဟုတ်ပါက overlap နှုတ်ပြီး ရှေ့တိုး ဖွင့်ပေးမည်
+                let startTime = (index === 0) ? currentTime : currentTime - overlap;
+                source.start(startTime);
+
+                // တကယ်ကုန်ဆုံးမည့် အချိန်ကို တွက်ချက်ခြင်း
+                currentTime = startTime + buffer.duration;
             });
 
             let totalTimeMs = (currentTime - ctx.currentTime) * 1000;
