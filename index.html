@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pa'O Smart Voice Engine (Flexible Combiner)</title>
+    <title>Pa'O Continuous Seamless Audio Engine</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -79,11 +79,11 @@
 <body>
 
     <div class="card">
-        <h2>Pa'O Smart Audio Reader</h2>
+        <h2>Pa'O Seamless Audio Reader</h2>
 
         <div class="form-group">
-            <label for="text">စာသားဂ ရိုက်ထည့်ပါ:</label>
-            <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - ဝွေꩻယိုနောဝ်ꩻ သို့မဟုတ် ဝွေꩻ ယို နောဝ်ꩻ)">
+            <label for="text">စာသား ရိုက်ထည့်ပါ:</label>
+            <input type="text" id="text" placeholder="စာရိုက်ပါ (ဥပမာ - ဝွေꩻယိုနောဝ်ꩻ)">
         </div>
 
         <div class="form-group">
@@ -108,7 +108,7 @@
         let audioCache = new Map();
         let ctx = null;
 
-        // ၁။ CSV ဖတ်ပြီး Index ဆောက်ခြင်း
+        // ၁။ CSV Metadata Indexing
         async function initEngine() {
             try {
                 let res = await fetch("metadata.csv");
@@ -131,7 +131,6 @@
                             }
                         }
                     }
-                    // အရှည်ဆုံး စကားလုံးများ အရင် လာအောင် စီမည်
                     sortedTranscripts.sort((a, b) => b.length - a.length);
                     document.getElementById("status").innerText = "အသင့်ဖြစ်ပါပြီ";
                 }
@@ -141,16 +140,13 @@
             }
         }
 
-        // ၂။ Bidirectional Smart Matching Algorithm
-        // (စာသား ခွဲရေးရေး၊ ကပ်ရေးရေး အသံဖိုင်ရှိရာကို အလိုအလျောက် ပေါင်း/ခွဲ ရှာပေးခြင်း)
+        // ၂။ Dynamic Matching Logic
         function smartMatchSplit(text) {
             let rawText = text.replace(/\s+/g, "");
             let tokens = [];
 
             while (rawText.length > 0) {
                 let matched = "";
-
-                // Metadata ထဲရှိ အရှည်ဆုံး စကားလုံး သို့မဟုတ် စကားစုနှင့် အရင် တိုက်ဆိုင်မှု ရှာမည်
                 for (let t of sortedTranscripts) {
                     if (rawText.startsWith(t)) {
                         matched = t;
@@ -169,7 +165,7 @@
             return tokens;
         }
 
-        // ၃။ Audio Fetching & RAM Cache
+        // ၃။ Audio Fetching with Memory Cache
         async function fetchAudioBuffer(filename, style) {
             let url = `${basePath}${style}/${filename}`;
 
@@ -189,7 +185,7 @@
             return null;
         }
 
-        // ၄။ Instant Audio Playback (Parallel Execution)
+        // ၄။ Continuous Audio Stitching Engine (အသံမရပ်ဘဲ ဆက်တိုက်ဖွင့်ပေးမည့် စနစ်)
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
@@ -207,7 +203,6 @@
 
             btn.disabled = true;
 
-            // စာသားကို Smart Match Algorithm ဖြင့် အလိုအလျောက် စီမံမည်
             let matchedWords = smartMatchSplit(text);
             
             let fetchPromises = matchedWords.map(w => {
@@ -225,24 +220,32 @@
 
             status.innerText = "ဖွင့်နေသည်...";
 
-            let currentTime = ctx.currentTime;
-            const overlap = 0.04; // 40ms overlap ဖြင့် အသံချောမောစွာ ဆက်သွားမည်
+            // Seamless Scheduler Logic
+            let startTime = ctx.currentTime + 0.05; // 50ms warm-up delay
+            const crossFadeOverlap = 0.08; // 80ms Overlap ဖြင့် အသံဖိုင်တစ်ခုနှင့်တစ်ခု ကြိုတင်ဆက်ပေးမည်
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
-                source.buffer = buffer;
-                source.connect(ctx.destination);
+                let gainNode = ctx.createGain();
 
-                let startTime = (index === 0) ? currentTime : currentTime - overlap;
-                source.start(startTime);
-                currentTime = startTime + buffer.duration;
+                source.buffer = buffer;
+                source.connect(gainNode);
+                gainNode.connect(ctx.destination);
+
+                // အသံစတင်မည့်အချိန်ကို Overlap နှုတ်၍ ဆက်တိုက် တိကျစွာ သတ်မှတ်ပေးခြင်း
+                let playAt = (index === 0) ? startTime : startTime - crossFadeOverlap;
+                
+                source.start(playAt);
+
+                // နောက်အသံဖိုင် စတင်မည့် အချိန်ကို အတိအကျ တွက်ချက်ခြင်း
+                startTime = playAt + buffer.duration;
             });
 
-            let totalTimeMs = (currentTime - ctx.currentTime) * 1000;
+            let totalDurationMs = (startTime - ctx.currentTime) * 1000;
             setTimeout(() => {
                 status.innerText = "အသင့်ဖြစ်ပါပြီ";
                 btn.disabled = false;
-            }, totalTimeMs);
+            }, totalDurationMs);
         }
 
         window.addEventListener("DOMContentLoaded", initEngine);
