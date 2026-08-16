@@ -1,22 +1,30 @@
 # pao-audio-dataset
 ပအိုဝ်ႏဘာႏသာႏငေါဝ်းငွါ အဆင်ႏအဗာႏခြွဉ်းဗူႏခင်ႏလမ်း အရွီးအခိုႏ အွဉ်ႏတိဉ်ႏလꩻနွောင်ꩻဒါႏ ထောင်ထွားနွောင်ꩻအီတာႏ အဆင်ႏခြွဉ်းဗူႏသွူဩ။
-https://khunphanduae.github.io/pao-audio-dataset/
-# Pa'O Audio Dataset & Web TTS Selector
 
-ဒီ Repository သည် ပအိုဝ်းဘာသာစကားအတွက် Text-to-Speech (TTS) အသံဒေတာစုနှင့် Web Selector နမူနာ ဖြစ်ပါသည်။
+🌐 **Web Demo:** [Pa'O TTS AI Generated Voice](https://khunphanduae.github.io/pao-audio-dataset/)
 
-## Folder Structure
+---
+
+## 📌 Project Overview
+
+ဒီ Repository သည် ပအိုဝ်းဘာသာစကားအတွက် Text-to-Speech (TTS)၊ Speech Recognition (ASR) နှင့် ဘာသာစကားဆိုင်ရာ နမူနာသုတေသနများတွင် မည်သူမဆို လွတ်လပ်စွာ ရယူအသုံးပြုနိုင်သည့် Open-Source Audio Dataset နှင့် Web Selector Interface ဖြစ်ပါသည်။
+
+---
+
+## 📁 Repository Structure
 
 ```text
 pao-audio-dataset/
 ├── index.html              # Web Interface
-├── script.js               # Audio Path Routing Logic
-├── metadata.csv            # Audio Transcripts & Speaker Info
+├── script.js               # Audio Path & Player Control Logic
+├── metadata.csv            # Audio Transcripts & Speaker Information
 ├── README.md
-└── audio/
-    ├── conversational/     # ပုံမှန် စကားပြောသံ
-    │   └── pao_audio_0047.wav
-    ├── news/               # သတင်းဖတ်သံ
-    │   └── pao_audio_0047.wav
-    └── storytelling/       # ပုံပြင်ပြောသံ
-        └── pao_audio_0047.wav
+├── LICENSE                 # CC0 1.0 Universal License
+├── corpus/                 # Plain Text Sentences (Text Corpus)
+│   ├── pao_sentences_650.txt
+│   ├── pao_sentences_662.txt
+│   └── pao_sentences_700.txt
+└── audio/                  # Audio Clips
+    ├── conversational/     # ပုံမှန် စကားပြောသံ (Conversational Audio)
+    ├── news/               # သတင်းဖတ်သံ (News Reading Audio)
+    └── storytelling/       # ပုံပြင်ပြောသံ (Storytelling Audio)
