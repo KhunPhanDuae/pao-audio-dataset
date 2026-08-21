@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pa'O TTS AI Generated Voice</title>
+    <title>Pa'O TTS AI Generated Voice & Voice Changer</title>
     <style>
         :root {
             --bg-color: #f4f6f9;
@@ -104,7 +104,7 @@
         }
 
         textarea {
-            height: 200px;
+            height: 180px;
             line-height: 1.6;
             resize: vertical;
             overflow-y: auto;
@@ -218,11 +218,23 @@
         </div>
 
         <div class="form-group">
-            <label for="audioStyle">အသံ အမျိုးအစား ရွေးပါ:</label>
+            <label for="audioStyle">အသံ စတိုင် ရွေးပါ:</label>
             <select id="audioStyle">
                 <option value="conversational">ပုံမှန် စကားပြောသံ (Conversational)</option>
                 <option value="storytelling">ပုံပြင် ပြောသံ (Storytelling)</option>
                 <option value="news">သတင်း ဖတ်သံ (News)</option>
+            </select>
+        </div>
+
+        <!-- အသံပြောင်းစနစ် (Voice Changer) Dropdown -->
+        <div class="form-group">
+            <label for="voiceChanger">အသံပြောင်းစနစ် (Voice Changer DSP):</label>
+            <select id="voiceChanger">
+                <option value="none">မူလအသံ (Original Voice)</option>
+                <option value="female">👩 မိန်းကလေးအသံ (Clear & Higher Pitch)</option>
+                <option value="male">👨 အမျိုးသားအသံ (Deep & Warm)</option>
+                <option value="child">🧒 ကလေးအသံ (High Pitch Child)</option>
+                <option value="robot">🤖 စက်ရုပ်အသံ (Robotic Tone)</option>
             </select>
         </div>
 
@@ -263,6 +275,15 @@
         let recordedChunks = [];
         let mediaRecorder = null;
         let audioBlob = null;
+
+        // DSP Voice Changer Profiles
+        const voiceProfiles = {
+            none:   { pitchShift: 1.00, hpFreq: 20,  f1Freq: 1000, f1Gain: 0, f2Freq: 2500, f2Gain: 0 },
+            female: { pitchShift: 1.22, hpFreq: 180, f1Freq: 900,  f1Gain: 3, f2Freq: 2600, f2Gain: 4 },
+            male:   { pitchShift: 0.86, hpFreq: 60,  f1Freq: 450,  f1Gain: 4, f2Freq: 1600, f2Gain: 2 },
+            child:  { pitchShift: 1.38, hpFreq: 240, f1Freq: 1100, f1Gain: 4, f2Freq: 3000, f2Gain: 5 },
+            robot:  { pitchShift: 1.00, hpFreq: 300, f1Freq: 1400, f1Gain: 12, f2Freq: 3200, f2Gain: 10 }
+        };
 
         // Theme Toggle Logic
         function toggleTheme() {
@@ -378,7 +399,8 @@
         async function playText() {
             let text = document.getElementById("text").value.trim();
             let style = document.getElementById("audioStyle").value;
-            let speed = parseFloat(document.getElementById("speedSlider").value);
+            let voiceMode = document.getElementById("voiceChanger").value;
+            let userSpeed = parseFloat(document.getElementById("speedSlider").value);
             let status = document.getElementById("status");
             let btn = document.getElementById("playBtn");
             let downloadBtn = document.getElementById("downloadBtn");
@@ -411,9 +433,45 @@
                 return;
             }
 
-            status.innerText = "ဖွင့်နေသည်...";
+            status.innerText = "အသံ ပြင်ဆင်ဖွင့်နေသည်...";
+
+            // Voice Profile & Combined Speed Configuration
+            let profile = voiceProfiles[voiceMode] || voiceProfiles.none;
+            let combinedRate = userSpeed * profile.pitchShift;
+
+            // DSP Audio Graph setup
+            let hpFilter = ctx.createBiquadFilter();
+            hpFilter.type = "highpass";
+            hpFilter.frequency.value = profile.hpFreq;
+
+            let f1Filter = ctx.createBiquadFilter();
+            f1Filter.type = "peaking";
+            f1Filter.frequency.value = profile.f1Freq;
+            f1Filter.Q.value = 1.5;
+            f1Filter.gain.value = profile.f1Gain;
+
+            let f2Filter = ctx.createBiquadFilter();
+            f2Filter.type = "peaking";
+            f2Filter.frequency.value = profile.f2Freq;
+            f2Filter.Q.value = 1.8;
+            f2Filter.gain.value = profile.f2Gain;
+
+            let compressor = ctx.createDynamicsCompressor();
+            compressor.threshold.value = -16;
+            compressor.knee.value = 10;
+            compressor.ratio.value = 4;
+            compressor.attack.value = 0.005;
+            compressor.release.value = 0.1;
 
             let dest = ctx.createMediaStreamDestination();
+
+            // DSP Node Chain Connection
+            hpFilter.connect(f1Filter);
+            f1Filter.connect(f2Filter);
+            f2Filter.connect(compressor);
+            compressor.connect(ctx.destination);
+            compressor.connect(dest);
+
             mediaRecorder = new MediaRecorder(dest.stream);
 
             mediaRecorder.ondataavailable = (e) => {
@@ -428,23 +486,20 @@
             mediaRecorder.start();
 
             let startTime = ctx.currentTime + 0.02;
-            const balancedOverlap = 0.09 / speed; // Speed ပြောင်းလဲမှုပေါ် မူတည်ပြီး overlap ကိုပါ ချိန်ညှိခြင်း
+            const balancedOverlap = 0.09 / combinedRate;
 
             buffers.forEach((buffer, index) => {
                 let source = ctx.createBufferSource();
                 source.buffer = buffer;
+                source.playbackRate.value = combinedRate;
 
-                // Speed Slider မှ Speed တန်ဖိုးကို AudioSource သို့ ထည့်သွင်းခြင်း
-                source.playbackRate.value = speed;
-
-                source.connect(ctx.destination);
-                source.connect(dest);
+                // DSP Filter Chain သို့ အသံချိတ်ဆက်ခြင်း
+                source.connect(hpFilter);
 
                 let playAt = (index === 0) ? startTime : startTime - balancedOverlap;
                 source.start(playAt);
 
-                // Speed ကြောင့် အသံကြာချိန် (Duration) တို/ရှည် ပြောင်းသွားသည်ကို တွက်ချက်ခြင်း
-                let effectiveDuration = buffer.duration / speed;
+                let effectiveDuration = buffer.duration / combinedRate;
                 startTime = playAt + effectiveDuration;
             });
 
